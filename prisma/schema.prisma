@@ -1,0 +1,606 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  CREATOR
+  MODERATOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum PostVisibility {
+  PUBLIC
+  FOLLOWERS_ONLY
+  PRIVATE
+}
+
+enum PostType {
+  TEXT
+  IMAGE
+  VIDEO
+  POLL
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  GIF
+}
+
+enum CommunityType {
+  PUBLIC
+  PRIVATE
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  MENTION
+  FOLLOW
+  MESSAGE
+  REPOST
+  COMMUNITY_ACTIVITY
+  FOLLOW_REQUEST
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+}
+
+model User {
+  id            String    @id @default(uuid())
+  username      String    @unique
+  email         String    @unique
+  displayName   String?
+  bio           String?
+  avatar        String?
+  coverImage    String?
+  location      String?
+  website       String?
+  verified      Boolean   @default(false)
+  role          UserRole  @default(USER)
+  passwordHash  String?
+  refreshToken  String?
+  emailVerified Boolean   @default(false)
+  googleId      String?   @unique
+  appleId       String?   @unique
+  isSuspended   Boolean   @default(false)
+  isBanned      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  posts         Post[]
+  comments      Comment[]
+  likes         Like[]
+  bookmarks     Bookmark[]
+  reposts       Repost[]
+
+  followers           Follow[]   @relation("following")
+  following           Follow[]   @relation("follower")
+  notifications       Notification[]
+  sentMessages        Message[]      @relation("sender")
+  receivedMessages    Message[]      @relation("receiver")
+  groupMessages       GroupMessage[]
+  groupMembers        GroupMember[]
+  communities           Community[]         @relation("owner")
+  communityMembers      CommunityMember[]
+  communityModerators   CommunityModerator[]
+  reports               Report[]            @relation("reporter")
+  moderatedReports      Report[]            @relation("moderator")
+  pollVotes             PollVote[]
+  videoViews            VideoView[]
+  commentReactions      CommentReaction[]
+  postMentions          PostMention[]
+  commentMentions       CommentMention[]
+  videos                Video[]
+  communityJoinRequests CommunityJoinRequest[]
+  conversationMembers   ConversationMember[]
+  messageReactions      MessageReaction[]
+  messageReadReceipts   MessageReadReceipt[]
+
+  @@map("users")
+}
+
+model Post {
+  id          String         @id @default(uuid())
+  authorId    String
+  author      User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content     String?
+  type        PostType       @default(TEXT)
+  visibility  PostVisibility @default(PUBLIC)
+  parentId    String?
+  parent      Post?          @relation("ThreadReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies     Post[]         @relation("ThreadReplies")
+  quoteOfId   String?
+  quoteOf     Post?          @relation("QuotePosts", fields: [quoteOfId], references: [id], onDelete: SetNull)
+  quotes      Post[]         @relation("QuotePosts")
+  communityId String?
+  community   Community?     @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  isPinned    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  media       Media[]
+  likes       Like[]
+  comments    Comment[]
+  bookmarks   Bookmark[]
+  reposts     Repost[]
+  poll        Poll?
+  hashtags    PostHashtag[]
+  mentions    PostMention[]
+  videos      Video[]
+
+  @@index([authorId])
+  @@index([parentId])
+  @@index([communityId])
+  @@index([createdAt])
+  @@map("posts")
+}
+
+model Media {
+  id        String    @id @default(uuid())
+  postId    String
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  type      MediaType
+  url       String
+  thumbnail String?
+  width     Int?
+  height    Int?
+  duration  Float?
+  size      Int?
+  createdAt DateTime  @default(now())
+
+  @@index([postId])
+  @@map("media")
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@index([postId])
+  @@map("likes")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies   Comment[] @relation("CommentReplies")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mentions  CommentMention[]
+  reactions CommentReaction[]
+
+  @@index([postId])
+  @@index([userId])
+  @@map("comments")
+}
+
+model CommentReaction {
+  id        String   @id @default(uuid())
+  commentId String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, userId, emoji])
+  @@map("comment_reactions")
+}
+
+model Bookmark {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@map("bookmarks")
+}
+
+model Repost {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@map("reposts")
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  follower    User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+  @@map("follows")
+}
+
+model Hashtag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  posts     PostHashtag[]
+
+  @@map("hashtags")
+}
+
+model PostHashtag {
+  postId    String
+  post      Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  hashtagId String
+  hashtag   Hashtag @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, hashtagId])
+  @@map("post_hashtags")
+}
+
+model PostMention {
+  id        String @id @default(uuid())
+  postId    String
+  post      Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("post_mentions")
+}
+
+model CommentMention {
+  id        String  @id @default(uuid())
+  commentId String
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@map("comment_mentions")
+}
+
+model Poll {
+  id        String     @id @default(uuid())
+  postId    String     @unique
+  post      Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  question  String
+  expiresAt DateTime?
+  createdAt DateTime   @default(now())
+
+  options   PollOption[]
+  votes     PollVote[]
+
+  @@map("polls")
+}
+
+model PollOption {
+  id       String     @id @default(uuid())
+  pollId   String
+  poll     Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  label    String
+  votes    PollVote[]
+
+  @@map("poll_options")
+}
+
+model PollVote {
+  id           String     @id @default(uuid())
+  pollId       String
+  poll         Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  optionId     String
+  option       PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([pollId, userId])
+  @@map("poll_votes")
+}
+
+model Video {
+  id            String   @id @default(uuid())
+  creatorId     String
+  creator       User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  postId        String?
+  post          Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+  title         String
+  description   String?
+  videoUrl      String
+  thumbnail     String?
+  duration      Float
+  width         Int?
+  height        Int?
+  size          Int?
+  mimeType      String?
+  views         Int      @default(0)
+  likes         Int      @default(0)
+  comments      Int      @default(0)
+  shares        Int      @default(0)
+  hlsUrl        String?
+  status        String   @default("processing")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tags          VideoTag[]
+  viewsRelation VideoView[]
+
+  @@index([creatorId])
+  @@index([createdAt])
+  @@map("videos")
+}
+
+model VideoTag {
+  id      String @id @default(uuid())
+  videoId String
+  video   Video  @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  tag     String
+
+  @@index([tag])
+  @@map("video_tags")
+}
+
+model VideoView {
+  id        String   @id @default(uuid())
+  videoId   String
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([videoId, userId])
+  @@map("video_views")
+}
+
+model Community {
+  id          String        @id @default(uuid())
+  name        String        @unique
+  slug        String        @unique
+  description String?
+  avatar      String?
+  coverImage  String?
+  type        CommunityType @default(PUBLIC)
+  ownerId     String
+  owner       User          @relation("owner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  members     CommunityMember[]
+  moderators  CommunityModerator[]
+  posts       Post[]
+  joinRequests CommunityJoinRequest[]
+
+  @@index([slug])
+  @@map("communities")
+}
+
+model CommunityMember {
+  id          String   @id @default(uuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt    DateTime @default(now())
+
+  @@unique([communityId, userId])
+  @@map("community_members")
+}
+
+model CommunityModerator {
+  id          String   @id @default(uuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedAt     DateTime @default(now())
+
+  @@unique([communityId, userId])
+  @@map("community_moderators")
+}
+
+model CommunityJoinRequest {
+  id          String        @id @default(uuid())
+  communityId String
+  community   Community     @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      String        @default("pending")
+  createdAt   DateTime      @default(now())
+  resolvedAt  DateTime?
+
+  @@unique([communityId, userId])
+  @@map("community_join_requests")
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  isGroup   Boolean  @default(false)
+  name      String?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   ConversationMember[]
+  messages  Message[]
+
+  @@map("conversations")
+}
+
+model ConversationMember {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt       DateTime     @default(now())
+  lastReadAt     DateTime?
+
+  @@unique([conversationId, userId])
+  @@map("conversation_members")
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation("sender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId     String?
+  receiver       User?        @relation("receiver", fields: [receiverId], references: [id], onDelete: SetNull)
+  content        String?
+  type           MessageType  @default(TEXT)
+  mediaUrl       String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  reactions   MessageReaction[]
+  readBy      MessageReadReceipt[]
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@map("messages")
+}
+
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@map("message_reactions")
+}
+
+model MessageReadReceipt {
+  id        String   @id @default(uuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt    DateTime @default(now())
+
+  @@unique([messageId, userId])
+  @@map("message_read_receipts")
+}
+
+model GroupMessage {
+  id        String   @id @default(uuid())
+  groupId   String
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content   String?
+  type      MessageType @default(TEXT)
+  mediaUrl  String?
+  createdAt DateTime @default(now())
+
+  @@map("group_messages")
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  groupId   String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("member")
+  joinedAt  DateTime @default(now())
+
+  @@unique([groupId, userId])
+  @@map("group_members")
+}
+
+model Notification {
+  id              String           @id @default(uuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            NotificationType
+  title           String
+  body            String?
+  data            Json?
+  read            Boolean          @default(false)
+  actorId         String?
+  createdAt       DateTime         @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  reporterId  String
+  reporter    User     @relation("reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetId    String
+  targetType  String
+  reason      String
+  description String?
+  status      String   @default("pending")
+  moderatorId String?
+  moderator   User?    @relation("moderator", fields: [moderatorId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+
+  @@index([status])
+  @@map("reports")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+model DeviceSession {
+  id        String   @id @default(uuid())
+  userId    String
+  deviceInfo String?
+  ip        String?
+  refreshToken String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("device_sessions")
+}
