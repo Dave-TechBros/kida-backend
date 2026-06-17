@@ -245,6 +245,13 @@ async function hashPassword() {
 
 async function main() {
   console.log('\n🌱 Starting KIDA database seed...\n');
+
+  const existingVideos = await prisma.video.count();
+  if (existingVideos > 0) {
+    console.log(`   ⏭️  Skipping seed — ${existingVideos} videos already exist`);
+    return;
+  }
+
   const hash = await hashPassword();
 
   // ── USERS ──
