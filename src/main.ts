@@ -9,25 +9,9 @@ import { execSync } from 'child_process';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const logger = new Logger('Bootstrap');
-
-  try {
-    logger.log('Running database schema sync...');
-    execSync('./node_modules/.bin/prisma db push --accept-data-loss --skip-generate', { stdio: 'inherit', timeout: 30000 });
-    logger.log('Database schema synced');
-  } catch {
-    logger.warn('Schema push failed, continuing...');
-  }
-
-  try {
-    execSync('./node_modules/.bin/prisma db seed', { stdio: 'inherit', timeout: 30000 });
-    logger.log('Database seeded');
-  } catch {
-    logger.log('Seed skipped (data may already exist)');
-  }
-
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { logger: ['log', 'error', 'warn'] });
   const configService = app.get(ConfigService);
+  const logger = new Logger('Bootstrap');
 
   app.setGlobalPrefix('api/v1');
 
@@ -65,6 +49,21 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0');
   logger.log(`KIDA API running on http://localhost:${port}`);
   logger.log(`Swagger docs at http://localhost:${port}/api/docs`);
+
+  process.nextTick(() => {
+    try {
+      execSync('./node_modules/.bin/prisma db push --accept-data-loss --skip-generate', { timeout: 30000 });
+      logger.log('Database schema synced');
+      try {
+        execSync('./node_modules/.bin/prisma db seed', { timeout: 30000 });
+        logger.log('Database seeded');
+      } catch {
+        logger.log('Seed skipped (data already exists)');
+      }
+    } catch (e) {
+      logger.warn('Database setup skipped: ' + (e instanceof Error ? e.message : ''));
+    }
+  });
 }
 
 bootstrap();
