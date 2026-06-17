@@ -5,11 +5,10 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import helmet from 'helmet';
-import { execSync } from 'child_process';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { logger: ['log', 'error', 'warn'] });
+  const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
@@ -49,21 +48,6 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0');
   logger.log(`KIDA API running on http://localhost:${port}`);
   logger.log(`Swagger docs at http://localhost:${port}/api/docs`);
-
-  process.nextTick(() => {
-    try {
-      execSync('./node_modules/.bin/prisma db push --accept-data-loss --skip-generate', { timeout: 30000 });
-      logger.log('Database schema synced');
-      try {
-        execSync('./node_modules/.bin/prisma db seed', { timeout: 30000 });
-        logger.log('Database seeded');
-      } catch {
-        logger.log('Seed skipped (data already exists)');
-      }
-    } catch (e) {
-      logger.warn('Database setup skipped: ' + (e instanceof Error ? e.message : ''));
-    }
-  });
 }
 
 bootstrap();
