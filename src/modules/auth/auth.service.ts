@@ -310,14 +310,14 @@ export class AuthService {
       this.jwtService.signAsync(
         { sub: userId, email, role },
         {
-          secret: this.configService.get('JWT_SECRET'),
+          secret: this.configService.get('JWT_SECRET', 'default-secret'),
           expiresIn: this.configService.get('JWT_EXPIRATION', '15m'),
         },
       ),
       this.jwtService.signAsync(
         { sub: userId, email, role },
         {
-          secret: this.configService.get('JWT_REFRESH_SECRET'),
+          secret: this.configService.get('JWT_REFRESH_SECRET', 'default-refresh-secret'),
           expiresIn: this.configService.get('JWT_REFRESH_EXPIRATION', '7d'),
         },
       ),
