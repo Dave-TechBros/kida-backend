@@ -5,9 +5,9 @@
   "scripts": {
     "build": "nest build",
     "postinstall": "prisma generate",
-    "start": "(prisma db push --accept-data-loss --skip-generate || true) && (prisma db seed || true) && node dist/src/main",
+    "start": "prisma db push --accept-data-loss --skip-generate && (prisma db seed || true) && node dist/src/main",
     "start:dev": "nest start --watch",
-    "start:prod": "(prisma db push --accept-data-loss --skip-generate || true) && (prisma db seed || true) && node dist/src/main",
+    "start:prod": "prisma db push --accept-data-loss --skip-generate && (prisma db seed || true) && node dist/src/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
