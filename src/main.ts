@@ -13,18 +13,17 @@ async function bootstrap() {
 
   try {
     logger.log('Running database schema sync...');
-    execSync('npx prisma db push --accept-data-loss --skip-generate', { stdio: 'inherit' });
+    execSync('./node_modules/.bin/prisma db push --accept-data-loss --skip-generate', { stdio: 'inherit', timeout: 30000 });
     logger.log('Database schema synced');
+  } catch {
+    logger.warn('Schema push failed, continuing...');
+  }
 
-    try {
-      execSync('npx prisma db seed', { stdio: 'inherit' });
-      logger.log('Database seeded');
-    } catch {
-      logger.log('Seed skipped (data may already exist)');
-    }
-  } catch (e) {
-    logger.error('Database setup failed', e);
-    process.exit(1);
+  try {
+    execSync('./node_modules/.bin/prisma db seed', { stdio: 'inherit', timeout: 30000 });
+    logger.log('Database seeded');
+  } catch {
+    logger.log('Seed skipped (data may already exist)');
   }
 
   const app = await NestFactory.create(AppModule);
