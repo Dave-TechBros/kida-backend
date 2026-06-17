@@ -5,12 +5,30 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import helmet from 'helmet';
+import { execSync } from 'child_process';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
+
+  try {
+    logger.log('Running database schema sync...');
+    execSync('npx prisma db push --accept-data-loss --skip-generate', { stdio: 'inherit' });
+    logger.log('Database schema synced');
+
+    try {
+      execSync('npx prisma db seed', { stdio: 'inherit' });
+      logger.log('Database seeded');
+    } catch {
+      logger.log('Seed skipped (data may already exist)');
+    }
+  } catch (e) {
+    logger.error('Database setup failed', e);
+    process.exit(1);
+  }
+
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
-  const logger = new Logger('Bootstrap');
 
   app.setGlobalPrefix('api/v1');
 
